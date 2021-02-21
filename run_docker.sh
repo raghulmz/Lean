@@ -129,12 +129,12 @@ fi
 # If DEBUGGING is set then set the entrypoint to run mono with a debugger server
 shopt -s nocasematch
 if [[ "$DEBUGGING" == "y" ]]; then
-  COMMAND+="-p 55555:55555 \
+  COMMAND+="-p 55556:55556 \
     --entrypoint mono \
-    $IMAGE --debug --debugger-agent=transport=dt_socket,server=y,address=0.0.0.0:55555,suspend=y \
+    $IMAGE --debug --debugger-agent=transport=dt_socket,server=y,address=0.0.0.0:55556,suspend=y \
     QuantConnect.Lean.Launcher.exe --data-folder /Data --results-destination-folder /Results --config /Lean/Launcher/config.json"
 
-  echo "Docker container starting, attach to Mono process at localhost:55555 to begin"
+  echo "Docker container starting, attach to Mono process at localhost:55556 to begin"
 else
   COMMAND+="$IMAGE --data-folder /Data --results-destination-folder /Results --config /Lean/Launcher/config.json"
 fi
