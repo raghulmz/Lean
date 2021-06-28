@@ -240,27 +240,24 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                     EventHandler handler = (sender, args) => subscription?.OnNewDataAvailable();
                     enumerator = _dataQueueHandler.Subscribe(request.Configuration, handler);
 
-                    if (CorporateEventEnumeratorFactory.ShouldEmitAuxiliaryBaseData(request.Configuration))
+                    var securityType = request.Configuration.SecurityType;
+                    var auxEnumerators = new List<IEnumerator<BaseData>>();
+
+                    if (securityType == SecurityType.Equity)
                     {
-                        var securityType = request.Configuration.SecurityType;
-                        var auxEnumerators = new List<IEnumerator<BaseData>>();
+                        auxEnumerators.Add(_dataQueueHandler.Subscribe(new SubscriptionDataConfig(request.Configuration, typeof(Dividend)), handler));
+                        auxEnumerators.Add(_dataQueueHandler.Subscribe(new SubscriptionDataConfig(request.Configuration, typeof(Split)), handler));
+                    }
 
-                        if (securityType == SecurityType.Equity)
-                        {
-                            auxEnumerators.Add(_dataQueueHandler.Subscribe(new SubscriptionDataConfig(request.Configuration, typeof(Dividend)), handler));
-                            auxEnumerators.Add(_dataQueueHandler.Subscribe(new SubscriptionDataConfig(request.Configuration, typeof(Split)), handler));
-                        }
+                    IEnumerator<BaseData> delistingEnumerator;
+                    if (LiveDelistingEventProviderEnumerator.TryCreate(request.Configuration, _timeProvider, _dataQueueHandler, request.Security.Cache, _mapFileProvider, out delistingEnumerator))
+                    {
+                        auxEnumerators.Add(delistingEnumerator);
+                    }
 
-                        IEnumerator<BaseData> delistingEnumerator;
-                        if (LiveDelistingEventProviderEnumerator.TryCreate(request.Configuration, _timeProvider, _dataQueueHandler, request.Security.Cache, _mapFileProvider, out delistingEnumerator))
-                        {
-                            auxEnumerators.Add(delistingEnumerator);
-                        }
-
-                        if (auxEnumerators.Count > 0)
-                        {
-                            enumerator = new LiveAuxiliaryDataSynchronizingEnumerator(_timeProvider, request.Configuration.ExchangeTimeZone, enumerator, auxEnumerators.ToArray());
-                        }
+                    if (auxEnumerators.Count > 0)
+                    {
+                        enumerator = new LiveAuxiliaryDataSynchronizingEnumerator(_timeProvider, request.Configuration.ExchangeTimeZone, enumerator, auxEnumerators.ToArray());
                     }
                 }
 
@@ -331,11 +328,12 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 // since the ticker plant will send the coarse data using this symbol
                 var normalizedSymbol = CoarseFundamental.CreateUniverseSymbol(config.Symbol.ID.Market, false);
 
-                // Will try to pull coarse data from the data folder every 30min, file with today's date.
+                // Will try to pull coarse data from the data folder every 10min, file with today's date.
                 // If lean is started today it will trigger initial coarse universe selection
                 var factory = new LiveCustomDataSubscriptionEnumeratorFactory(_timeProvider,
                     // we adjust time to the previous tradable date
-                    time => Time.GetStartTimeForTradeBars(request.Security.Exchange.Hours, time, Time.OneDay, 1, false, config.DataTimeZone)
+                    time => Time.GetStartTimeForTradeBars(request.Security.Exchange.Hours, time, Time.OneDay, 1, false, config.DataTimeZone),
+                    TimeSpan.FromMinutes(10)
                 );
                 var enumeratorStack = factory.CreateEnumerator(request, _dataProvider);
 
