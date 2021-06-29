@@ -10,11 +10,11 @@ MAINTAINER QuantConnect <contact@quantconnect.com>
 
 # Install Tini
 RUN if [ "$(uname -m)" = "aarch64" ]; then \
-        tini_binary="tini-arm64"; \
-        tini_sha256="07952557df20bfd2a95f9bef198b445e006171969499a1d361bd9e6f8e5e0e81"; \
+    tini_binary="tini-arm64"; \
+    tini_sha256="07952557df20bfd2a95f9bef198b445e006171969499a1d361bd9e6f8e5e0e81"; \
     else \
-        tini_binary="tini-amd64"; \
-        tini_sha256="93dcc18adc78c65a028a84799ecf8ad40c936fdfc5f2a57b1acda5a8117fa82c"; \
+    tini_binary="tini-amd64"; \
+    tini_sha256="93dcc18adc78c65a028a84799ecf8ad40c936fdfc5f2a57b1acda5a8117fa82c"; \
     fi && \
     wget --quiet -O tini "https://github.com/krallin/tini/releases/download/v0.19.0/${tini_binary}" && \
     echo "${tini_sha256} *tini" | sha256sum -c - && \
@@ -29,10 +29,16 @@ RUN pip install clr-loader==0.1.6
 ENV LD_LIBRARY_PATH=/lib/
 RUN ln -s /lib/$(uname -m)-linux-gnu/libc.so.6 /lib/$(uname -m)-linux-gnu/libc.so
 
-# Install .NET Interactive to support C# in Jupyter notebooks
-ENV PATH="${PATH}:/root/.dotnet/tools"
-RUN dotnet tool install -g --add-source "https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json" Microsoft.dotnet-interactive && \
-    dotnet interactive jupyter install
+RUN wget https://packages.microsoft.com/config/ubuntu/16.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb && \
+    dpkg -i packages-microsoft-prod.deb && \
+    apt-get update; \
+    apt-get install -y apt-transport-https && \
+    apt-get update && \
+    apt-get install -y dotnet-sdk-5.0
+
+RUN dotnet tool install -g --add-source "https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json" Microsoft.dotnet-interactive
+ENV PATH="/root/.dotnet/tools:${PATH}"
+RUN dotnet interactive jupyter install
 
 # Setting some environment variables
 ENV WORK /Lean/Launcher/bin/Debug/
