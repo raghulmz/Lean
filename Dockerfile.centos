@@ -1,0 +1,34 @@
+FROM centos
+
+RUN rpm -Uvh https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm && \
+    yum install dotnet-sdk-5.0
+
+
+# Setting some environment variables
+ENV WORK /Lean/Launcher/bin/Debug/
+ENV PYTHONPATH=${WORK}:${PYTHONPATH}
+
+# Clone Lean; Link Python startup file to profile; Install Lean/PythonToolbox; Remove extra files
+RUN git clone --depth=1 https://github.com/QuantConnect/Lean.git && \
+    mkdir -p /root/.ipython/profile_default/startup/ && \
+    ln -s /Lean/Launcher/bin/Debug/start.py /root/.ipython/profile_default/startup/start.py && \
+    cd Lean/PythonToolbox && python setup.py install \
+    && cd ../.. && rm -irf Lean
+
+
+#Create initialize script
+RUN echo "if [ ! -d \"${WORK}Notebooks\" ]; then mkdir ${WORK}Notebooks; fi && \
+    if [ ! -f \"${WORK}Notebooks/config.json\" ]; then echo '{ \"data-folder\": \"/home/Data/\", \
+    \"composer-dll-directory\": \"$WORK\", \"algorithm-language\": \"Python\", \
+    \"messaging-handler\": \"QuantConnect.Messaging.Messaging\", \"job-queue-handler\": \"QuantConnect.Queues.JobQueue\", \
+    \"api-handler\": \"QuantConnect.Api.Api\" }' > ${WORK}Notebooks/config.json; fi && \
+    echo \"Starting JupyterLab, access in your browser at localhost:8888\" && \
+    jupyter lab --ip='0.0.0.0' --port=8888 --no-browser --allow-root --notebook-dir=\"Notebooks\" --LabApp.token='' " \
+    > start.sh
+
+RUN chmod -R 777 ${WORK}
+EXPOSE 8888
+WORKDIR $WORK
+
+ENTRYPOINT [ "/usr/local/bin/tini", "--" ]
+CMD ./start.sh
